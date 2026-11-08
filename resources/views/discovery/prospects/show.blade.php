@@ -1,5 +1,5 @@
 <x-layouts::app :title="$prospect->name">
-    <div class="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6">
+    <div class="flex w-full flex-1 flex-col gap-6">
         <div class="flex flex-col gap-3">
             <a href="{{ route('discovery.prospects.index') }}" wire:navigate class="text-sm text-neutral-500 hover:text-neutral-950 dark:hover:text-white">← All prospects</a>
             <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
@@ -47,8 +47,8 @@
             </script>
         @endif
 
-        <div class="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-            <section class="flex flex-col gap-4 rounded-xl border border-neutral-200 bg-white p-6 dark:border-neutral-700 dark:bg-neutral-900">
+        <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,0.72fr)]">
+            <section class="flex flex-col gap-4 rounded-xl border border-neutral-200 bg-white p-6 lg:col-start-1 dark:border-neutral-700 dark:bg-neutral-900">
                 <div>
                     <flux:heading>Why it fits</flux:heading>
                     <p class="mt-2 text-sm leading-6 text-neutral-600 dark:text-neutral-300">{{ $prospect->assessments->first()?->rationale ?? 'This prospect has not been assessed yet.' }}</p>
@@ -69,7 +69,7 @@
                 </div>
             </section>
 
-            <section class="flex flex-col gap-4 rounded-xl border border-neutral-200 bg-white p-6 dark:border-neutral-700 dark:bg-neutral-900">
+            <section class="flex flex-col gap-4 rounded-xl border border-neutral-200 bg-white p-6 lg:col-start-1 dark:border-neutral-700 dark:bg-neutral-900">
                 <flux:heading>Public profile</flux:heading>
                 @if ($prospect->website)
                     <a href="{{ $prospect->website }}" target="_blank" rel="noreferrer" class="text-sm text-blue-600 underline underline-offset-4 dark:text-blue-400">{{ $prospect->website }}</a>
@@ -79,9 +79,7 @@
                     <a href="{{ $profile }}" target="_blank" rel="noreferrer" class="text-sm text-blue-600 underline underline-offset-4 dark:text-blue-400">{{ $profile }}</a>
                 @endforeach
             </section>
-        </div>
-
-        <section class="rounded-xl border border-neutral-200 bg-white p-6 dark:border-neutral-700 dark:bg-neutral-900">
+        <section class="rounded-xl border border-neutral-200 bg-white p-6 lg:col-start-2 lg:row-start-1 dark:border-neutral-700 dark:bg-neutral-900">
             <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
                 <div>
                     <flux:heading>First outreach</flux:heading>
@@ -153,7 +151,7 @@
             @endif
         </section>
 
-        <section class="rounded-xl border border-neutral-200 bg-white p-6 dark:border-neutral-700 dark:bg-neutral-900">
+        <section class="rounded-xl border border-neutral-200 bg-white p-6 lg:col-start-2 dark:border-neutral-700 dark:bg-neutral-900">
             <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
                 <div>
                     <flux:heading>Replies and follow-ups</flux:heading>
@@ -195,7 +193,7 @@
             @endif
         </section>
 
-        <section class="rounded-xl border border-neutral-200 bg-white p-6 dark:border-neutral-700 dark:bg-neutral-900">
+        <section class="rounded-xl border border-neutral-200 bg-white p-6 lg:col-start-1 dark:border-neutral-700 dark:bg-neutral-900">
             <flux:heading>Sources</flux:heading>
             <div class="mt-4 flex flex-col divide-y divide-neutral-200 dark:divide-neutral-700">
                 @forelse ($prospect->observations as $observation)
@@ -211,5 +209,6 @@
                 @endforelse
             </div>
         </section>
+        </div>
     </div>
 </x-layouts::app>
