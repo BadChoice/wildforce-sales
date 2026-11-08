@@ -78,6 +78,24 @@
                 @foreach ($prospect->social_profiles ?? [] as $profile)
                     <a href="{{ $profile }}" target="_blank" rel="noreferrer" class="text-sm text-blue-600 underline underline-offset-4 dark:text-blue-400">{{ $profile }}</a>
                 @endforeach
+                <form method="POST" action="{{ route('discovery.prospects.language.update', $prospect) }}" class="mt-2 grid gap-3 border-t border-neutral-200 pt-4 dark:border-neutral-700">
+                    @csrf
+                    @method('PATCH')
+                    <flux:select name="preferred_language" label="Outreach language">
+                        <option value="ca" @selected($prospect->outreachLanguage() === 'ca')>Català</option>
+                        <option value="es" @selected($prospect->outreachLanguage() === 'es')>Castellà</option>
+                    </flux:select>
+                    <div><flux:button type="submit" size="sm" variant="ghost">Save language</flux:button></div>
+                </form>
+                @if ($prospect->status->value !== 'rejected')
+                    <form method="POST" action="{{ route('discovery.prospects.disqualify', $prospect) }}" class="grid gap-3 border-t border-neutral-200 pt-4 dark:border-neutral-700">
+                        @csrf
+                        <flux:input name="disqualification_reason" label="Disqualify reason" placeholder="e.g. Pilates studio" required />
+                        <div><flux:button type="submit" size="sm" variant="danger" icon="x-mark">Disqualify prospect</flux:button></div>
+                    </form>
+                @elseif ($prospect->disqualification_reason)
+                    <div class="border-t border-neutral-200 pt-4 text-sm text-red-700 dark:border-neutral-700 dark:text-red-300">Disqualified: {{ $prospect->disqualification_reason }}</div>
+                @endif
             </section>
         <section class="rounded-xl border border-neutral-200 bg-white p-6 lg:col-start-2 lg:row-start-1 dark:border-neutral-700 dark:bg-neutral-900">
             <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
@@ -118,6 +136,18 @@
                         </div>
                     @endif
 
+                    @if ($outreach->value_proposition_keys)
+                        <div>
+                            <div class="text-xs font-medium uppercase tracking-wide text-neutral-500">Selected value</div>
+                            <ul class="mt-2 flex flex-col gap-1 text-sm text-neutral-600 dark:text-neutral-300">
+                                @foreach ($outreach->value_proposition_keys as $key)
+                                    @php($proposition = config("growth.outreach.value_propositions.{$key}"))
+                                    <li>• {{ $proposition[$outreach->language] ?? $key }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
+
                     <div>
                         <div class="text-xs font-medium uppercase tracking-wide text-neutral-500">Draft</div>
                         <pre class="mt-2 whitespace-pre-wrap rounded-md bg-neutral-50 p-4 text-sm leading-6 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200">{{ $outreach->message }}</pre>
@@ -133,6 +163,10 @@
                         <flux:button type="button" variant="ghost" x-data x-on:click="navigator.clipboard.writeText({{ Js::from($outreach->message) }})" icon="clipboard">Copy message</flux:button>
 
                         @if ($outreach->status->value === 'draft')
+                            <form method="POST" action="{{ route('discovery.outreaches.regenerate', $outreach) }}">
+                                @csrf
+                                <flux:button type="submit" variant="ghost" icon="arrow-path">Rebuild draft</flux:button>
+                            </form>
                             <form method="POST" action="{{ route('discovery.outreaches.approve', $outreach) }}">
                                 @csrf
                                 <flux:button type="submit" variant="primary" icon="check">Approve draft</flux:button>

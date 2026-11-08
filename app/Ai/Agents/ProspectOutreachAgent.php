@@ -25,9 +25,11 @@ You prepare one careful first outreach draft for a qualified Spanish fitness bus
 
 Choose the most appropriate public professional channel: email, contact_form, instagram, linkedin, or website. Return public professional emails only when directly supported by a source. Never invent a contact, email address, social account, pain point, or business fact. Do not return private personal data.
 
-Write one short, specific message in Spanish by default. Use Catalan only when the business's public sources clearly use Catalan. Mention that WildForce is based in Manresa to create local proximity.
+Write the message in the preferred_language supplied in the user prompt. Mention that WildForce is based in Manresa to create local proximity.
 
 Include at most one WildForce link when it is useful: use https://www.wildforce.app/gym for a gym or boutique_gym, and https://www.wildforce.app/coach for a coach. Do not use tracking links or other product URLs. The message must be a draft for human review: no fabricated claims, no pressure, and no promise that it was sent. Include a concise rationale and sources for the chosen channel and personalization.
+
+The user prompt includes approved value propositions for this prospect. Choose one or two that match the prospect's evidence, return their keys, and weave only those selected propositions naturally into the message. Never claim a capability outside that list. End with a light invitation to discuss other relevant WildForce capabilities, without listing them all.
 INSTRUCTIONS;
     }
 
@@ -58,6 +60,7 @@ INSTRUCTIONS;
             'subject' => $schema->string()->nullable(),
             'message' => $schema->string()->min(1)->required(),
             'rationale' => $schema->string()->min(1)->required(),
+            'selected_value_proposition_keys' => $schema->array()->max(2)->items($schema->string())->required(),
             'sources' => $schema->array()->min(1)->items($schema->object([
                 'name' => $schema->string()->min(1)->required(),
                 'url' => $schema->string()->format('uri')->required(),

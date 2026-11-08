@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 /**
  * @property ProspectStatus $status
  */
-#[Fillable(['canonical_key', 'name', 'segment', 'website', 'domain', 'city', 'province', 'country', 'public_phone', 'social_profiles', 'status', 'score', 'confidence', 'suggested_angle', 'detected_services', 'signals', 'last_discovered_at', 'contacted_at', 'replied_at', 'follow_up_paused_at', 'follow_up_pause_reason'])]
+#[Fillable(['canonical_key', 'name', 'segment', 'website', 'domain', 'city', 'province', 'country', 'preferred_language', 'public_phone', 'social_profiles', 'status', 'score', 'confidence', 'suggested_angle', 'detected_services', 'signals', 'last_discovered_at', 'contacted_at', 'replied_at', 'follow_up_paused_at', 'follow_up_pause_reason', 'disqualification_reason'])]
 class Prospect extends Model
 {
     /** @use HasFactory<ProspectFactory> */
@@ -144,5 +144,14 @@ class Prospect extends Model
             'Closed' => 'red',
             default => 'amber',
         };
+    }
+
+    public function outreachLanguage(): string
+    {
+        if ($this->preferred_language !== null) {
+            return $this->preferred_language;
+        }
+
+        return in_array($this->province, ['Barcelona', 'Girona', 'Lleida', 'Tarragona'], true) ? 'ca' : 'es';
     }
 }

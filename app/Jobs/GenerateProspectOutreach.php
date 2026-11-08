@@ -9,7 +9,6 @@ use App\Services\Discovery\ProspectOutreachService;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
-use Illuminate\Validation\ValidationException;
 use Throwable;
 
 class GenerateProspectOutreach implements ShouldBeUnique, ShouldQueue
@@ -54,7 +53,7 @@ class GenerateProspectOutreach implements ShouldBeUnique, ShouldQueue
 
         try {
             $outreaches->complete($outreach, $response);
-        } catch (ValidationException $exception) {
+        } catch (Throwable $exception) {
             $outreaches->fail($outreach, $exception);
         }
     }

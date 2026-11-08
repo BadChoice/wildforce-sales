@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * @property ProspectOutreachStatus $status
  */
-#[Fillable(['status', 'provider', 'model', 'prompt', 'channel', 'channel_url', 'public_email', 'recipient_name', 'recipient_role', 'language', 'subject', 'message', 'rationale', 'sources', 'input_tokens', 'output_tokens', 'result', 'error_message', 'started_at', 'generated_at', 'approved_by_user_id', 'approved_at', 'sent_at'])]
+#[Fillable(['status', 'provider', 'model', 'prompt', 'channel', 'channel_url', 'public_email', 'recipient_name', 'recipient_role', 'language', 'subject', 'message', 'rationale', 'value_proposition_keys', 'sources', 'input_tokens', 'output_tokens', 'result', 'error_message', 'started_at', 'generated_at', 'approved_by_user_id', 'approved_at', 'sent_at', 'superseded_at'])]
 class ProspectOutreach extends Model
 {
     /** @use HasFactory<ProspectOutreachFactory> */
@@ -23,11 +23,13 @@ class ProspectOutreach extends Model
         return [
             'status' => ProspectOutreachStatus::class,
             'sources' => 'array',
+            'value_proposition_keys' => 'array',
             'result' => 'array',
             'started_at' => 'datetime',
             'generated_at' => 'datetime',
             'approved_at' => 'datetime',
             'sent_at' => 'datetime',
+            'superseded_at' => 'datetime',
         ];
     }
 

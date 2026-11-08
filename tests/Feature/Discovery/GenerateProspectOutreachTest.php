@@ -65,6 +65,32 @@ it('queues a new outreach draft after a previous generation failed', function ()
     Queue::assertPushed(GenerateProspectOutreach::class);
 });
 
+it('rebuilds a draft while preserving the previous version', function () {
+    Queue::fake([GenerateProspectOutreach::class]);
+
+    $user = User::factory()->growthAdmin()->create();
+    $prospect = readyForOutreach();
+    $outreach = ProspectOutreach::factory()->for($prospect)->create([
+        'status' => ProspectOutreachStatus::Draft,
+        'message' => 'Previous draft.',
+    ]);
+
+    $this->actingAs($user)
+        ->post(route('discovery.outreaches.regenerate', $outreach))
+        ->assertRedirect()
+        ->assertSessionHas('status', 'Outreach draft rebuild queued.');
+
+    $this->assertDatabaseHas('prospect_outreaches', [
+        'id' => $outreach->id,
+        'status' => 'superseded',
+    ]);
+    $this->assertDatabaseHas('prospect_outreaches', [
+        'prospect_id' => $prospect->id,
+        'status' => 'queued',
+    ]);
+    Queue::assertPushed(GenerateProspectOutreach::class);
+});
+
 it('forbids outreach generation for a user without growth access', function () {
     Queue::fake([GenerateProspectOutreach::class]);
 
@@ -151,6 +177,7 @@ function outreachResponse(): array
         'subject' => 'Seguimiento de clientes en Strength Studio',
         'message' => 'Hola, he visto que ofrecéis entrenamiento personal en Barcelona. WildForce puede centralizar planes y seguimiento de clientes. ¿Te va bien verlo en una demo breve?',
         'rationale' => 'The website publishes a professional email and offers personal training.',
+        'selected_value_proposition_keys' => ['scheduled_check_ins'],
         'sources' => [[
             'name' => 'Strength Studio website',
             'url' => 'https://strength.example.com',

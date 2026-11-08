@@ -3,13 +3,17 @@
 namespace App\Http\Controllers;
 
 use App\Enums\ProspectStatus;
+use App\Http\Requests\DisqualifyProspectRequest;
 use App\Http\Requests\StoreProspectReplyRequest;
+use App\Http\Requests\UpdateProspectLanguageRequest;
 use App\Models\Prospect;
+use App\Models\ProspectEnrichment;
 use App\Models\ProspectOutreach;
 use App\Models\User;
 use App\Services\Discovery\ProspectEnrichmentService;
 use App\Services\Discovery\ProspectOutreachService;
 use App\Services\Discovery\ProspectReplyService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -17,21 +21,91 @@ use LogicException;
 
 class ProspectController extends Controller
 {
+    /** @var array<string, string> */
+    private const SORTABLE_COLUMNS = [
+        'business' => 'name',
+        'location' => 'city',
+        'status' => 'status',
+        'enrichment' => 'enrichment',
+        'outreach' => 'outreach',
+        'contact' => 'contact',
+        'progress' => 'progress',
+        'fit' => 'score',
+        'suggested-angle' => 'suggested_angle',
+    ];
+
     public function index(Request $request): View
     {
         $status = ProspectStatus::tryFrom($request->string('status')->toString());
         $search = $request->string('search')->trim()->toString();
+        $sort = $request->string('sort')->toString();
+        $sort = array_key_exists($sort, self::SORTABLE_COLUMNS) ? $sort : 'fit';
+        $direction = $request->string('direction')->toString() === 'asc' ? 'asc' : 'desc';
 
-        $prospects = Prospect::query()
+        $prospectsQuery = Prospect::query()
             ->with(['latestEnrichment', 'latestOutreach', 'latestReply'])
             ->when($status, fn ($query) => $query->where('status', $status))
-            ->when($search !== '', fn ($query) => $query->where('name', 'like', "%{$search}%"))
-            ->orderByDesc('score')
+            ->when($search !== '', fn ($query) => $query->where('name', 'like', "%{$search}%"));
+
+        $this->applySort($prospectsQuery, $sort, $direction);
+
+        $prospects = $prospectsQuery
             ->orderByDesc('id')
             ->paginate(20)
             ->withQueryString();
 
-        return view('discovery.prospects.index', compact('prospects', 'search', 'status'));
+        return view('discovery.prospects.index', compact('direction', 'prospects', 'search', 'sort', 'status'));
+    }
+
+    /** @param Builder<Prospect> $prospectsQuery */
+    private function applySort(Builder $prospectsQuery, string $sort, string $direction): void
+    {
+        match ($sort) {
+            'location' => $prospectsQuery->orderBy('city', $direction)->orderBy('province', $direction),
+            'enrichment' => $prospectsQuery->orderBy($this->latestEnrichmentStatus(), $direction),
+            'outreach' => $prospectsQuery->orderBy($this->latestOutreachStatus(), $direction),
+            'contact' => $prospectsQuery->orderByRaw(<<<SQL
+                case
+                    when replied_at is not null then 2
+                    when contacted_at is not null then 1
+                    else 0
+                end {$direction}
+            SQL),
+            'progress' => $prospectsQuery->orderByRaw(<<<SQL
+                case
+                    when replied_at is not null then 100
+                    when contacted_at is not null then 90
+                    when exists (select 1 from prospect_outreaches where prospect_outreaches.prospect_id = prospects.id) then 75
+                    when status = ? then 60
+                    when status = ? then 45
+                    when status = ? then 100
+                    else 25
+                end {$direction}
+            SQL, [
+                ProspectStatus::Qualified->value,
+                ProspectStatus::Enriched->value,
+                ProspectStatus::Rejected->value,
+            ]),
+            default => $prospectsQuery->orderBy(self::SORTABLE_COLUMNS[$sort], $direction),
+        };
+    }
+
+    private function latestEnrichmentStatus(): Builder
+    {
+        return ProspectEnrichment::query()
+            ->select('status')
+            ->whereColumn('prospect_enrichments.prospect_id', 'prospects.id')
+            ->latest('id')
+            ->limit(1);
+    }
+
+    private function latestOutreachStatus(): Builder
+    {
+        return ProspectOutreach::query()
+            ->select('status')
+            ->whereColumn('prospect_outreaches.prospect_id', 'prospects.id')
+            ->latest('id')
+            ->limit(1);
     }
 
     public function show(Prospect $prospect): View
@@ -64,6 +138,17 @@ class ProspectController extends Controller
         }
 
         return back()->with('status', "Outreach draft queued for '{$prospect->name}'.");
+    }
+
+    public function regenerateOutreach(ProspectOutreach $outreach, ProspectOutreachService $outreaches): RedirectResponse
+    {
+        try {
+            $outreaches->regenerate($outreach);
+        } catch (LogicException $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
+
+        return back()->with('status', 'Outreach draft rebuild queued.');
     }
 
     public function approveOutreach(Request $request, ProspectOutreach $outreach, ProspectOutreachService $outreaches): RedirectResponse
@@ -110,5 +195,24 @@ class ProspectController extends Controller
         $replies->pauseFollowUps($prospect);
 
         return back()->with('status', 'Future follow-ups paused.');
+    }
+
+    public function updateLanguage(UpdateProspectLanguageRequest $request, Prospect $prospect): RedirectResponse
+    {
+        $prospect->update($request->validated());
+
+        return back()->with('status', "Outreach language set to {$prospect->preferred_language}.");
+    }
+
+    public function disqualify(DisqualifyProspectRequest $request, Prospect $prospect): RedirectResponse
+    {
+        $prospect->update([
+            'status' => ProspectStatus::Rejected,
+            'disqualification_reason' => $request->string('disqualification_reason')->toString(),
+            'follow_up_paused_at' => now(),
+            'follow_up_pause_reason' => 'Disqualified',
+        ]);
+
+        return back()->with('status', 'Prospect disqualified and follow-ups paused.');
     }
 }

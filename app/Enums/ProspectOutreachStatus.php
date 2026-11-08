@@ -9,6 +9,7 @@ enum ProspectOutreachStatus: string
     case Draft = 'draft';
     case Approved = 'approved';
     case Sent = 'sent';
+    case Superseded = 'superseded';
     case Failed = 'failed';
 
     public function label(): string
@@ -19,6 +20,7 @@ enum ProspectOutreachStatus: string
             self::Draft => 'Draft ready',
             self::Approved => 'Approved',
             self::Sent => 'Sent',
+            self::Superseded => 'Superseded',
             self::Failed => 'Failed',
         };
     }
@@ -31,6 +33,7 @@ enum ProspectOutreachStatus: string
             self::Draft => 'violet',
             self::Approved => 'green',
             self::Sent => 'emerald',
+            self::Superseded => 'zinc',
             self::Failed => 'red',
         };
     }

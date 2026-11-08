@@ -14,6 +14,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Laravel\Ai\Responses\StructuredAgentResponse;
 use LogicException;
 use Throwable;
@@ -28,7 +29,7 @@ class ProspectOutreachService
             $this->ensureProspectIsReady($prospect);
 
             $existingOutreach = $prospect->outreaches()
-                ->whereNotIn('status', [ProspectOutreachStatus::Failed, ProspectOutreachStatus::Sent])
+                ->whereNotIn('status', [ProspectOutreachStatus::Failed, ProspectOutreachStatus::Sent, ProspectOutreachStatus::Superseded])
                 ->latest()
                 ->first();
 
@@ -62,8 +63,24 @@ class ProspectOutreachService
         ]);
     }
 
+    public function regenerate(ProspectOutreach $outreach): ProspectOutreach
+    {
+        if ($outreach->status !== ProspectOutreachStatus::Draft) {
+            throw new LogicException('Only a draft can be rebuilt.');
+        }
+
+        $outreach->update([
+            'status' => ProspectOutreachStatus::Superseded,
+            'superseded_at' => now(),
+        ]);
+
+        return $this->queue($outreach->prospect);
+    }
+
     public function complete(ProspectOutreach $outreach, StructuredAgentResponse $response): void
     {
+        $allowedValuePropositionKeys = array_keys($this->valuePropositionsFor($outreach->prospect));
+
         $data = Validator::validate($response->structured, [
             'channel' => ['required', 'in:email,contact_form,instagram,linkedin,website'],
             'channel_url' => ['nullable', 'url', 'max:2000'],
@@ -74,6 +91,8 @@ class ProspectOutreachService
             'subject' => ['nullable', 'string', 'max:255'],
             'message' => ['required', 'string', 'max:4000'],
             'rationale' => ['required', 'string', 'max:2000'],
+            'selected_value_proposition_keys' => ['present', 'array', 'max:2'],
+            'selected_value_proposition_keys.*' => ['string', Rule::in($allowedValuePropositionKeys)],
             'sources' => ['required', 'array', 'min:1'],
             'sources.*.name' => ['required', 'string', 'max:255'],
             'sources.*.url' => ['required', 'url', 'max:2000'],
@@ -92,6 +111,7 @@ class ProspectOutreachService
                 'subject' => $data['subject'],
                 'message' => $data['message'],
                 'rationale' => $data['rationale'],
+                'value_proposition_keys' => $data['selected_value_proposition_keys'],
                 'sources' => $data['sources'],
                 'input_tokens' => $response->usage->inputTokens,
                 'output_tokens' => $response->usage->outputTokens,
@@ -165,9 +185,11 @@ class ProspectOutreachService
                 'city' => $prospect->city,
                 'province' => $prospect->province,
                 'country' => $prospect->country,
+                'preferred_language' => $prospect->outreachLanguage(),
                 'score' => $prospect->score,
                 'suggested_angle' => $prospect->suggested_angle,
                 'signals' => $prospect->signals,
+                'value_propositions' => $this->valuePropositionsFor($prospect),
                 'latest_assessment' => $prospect->assessments()->latest()->value('rationale'),
                 'known_sources' => $prospect->observations->map(fn ($observation): array => [
                     'name' => $observation->source_name,
@@ -175,5 +197,14 @@ class ProspectOutreachService
                 ])->all(),
             ],
         ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
+    }
+
+    /** @return array<string, array<string, mixed>> */
+    private function valuePropositionsFor(Prospect $prospect): array
+    {
+        return array_filter(
+            config('growth.outreach.value_propositions', []),
+            fn (array $proposition): bool => in_array($prospect->segment, $proposition['segments'], true),
+        );
     }
 }

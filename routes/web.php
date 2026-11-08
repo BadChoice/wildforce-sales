@@ -24,7 +24,10 @@ Route::middleware(['auth', 'verified', 'can:access-growth'])
         Route::post('prospects/{prospect}/outreach', [ProspectController::class, 'generateOutreach'])->name('prospects.outreach.generate');
         Route::post('prospects/{prospect}/replies', [ProspectController::class, 'storeReply'])->name('prospects.replies.store');
         Route::post('prospects/{prospect}/pause-follow-ups', [ProspectController::class, 'pauseFollowUps'])->name('prospects.follow-ups.pause');
+        Route::patch('prospects/{prospect}/language', [ProspectController::class, 'updateLanguage'])->name('prospects.language.update');
+        Route::post('prospects/{prospect}/disqualify', [ProspectController::class, 'disqualify'])->name('prospects.disqualify');
         Route::post('outreaches/{outreach}/approve', [ProspectController::class, 'approveOutreach'])->name('outreaches.approve');
+        Route::post('outreaches/{outreach}/regenerate', [ProspectController::class, 'regenerateOutreach'])->name('outreaches.regenerate');
         Route::post('outreaches/{outreach}/mark-sent', [ProspectController::class, 'markOutreachSent'])->name('outreaches.mark-sent');
     });
 
