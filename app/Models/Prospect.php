@@ -19,6 +19,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 #[Fillable(['canonical_key', 'name', 'segment', 'website', 'domain', 'city', 'province', 'country', 'preferred_language', 'public_phone', 'social_profiles', 'status', 'score', 'confidence', 'suggested_angle', 'detected_services', 'signals', 'last_discovered_at', 'contacted_at', 'replied_at', 'follow_up_paused_at', 'follow_up_pause_reason', 'disqualification_reason'])]
 class Prospect extends Model
 {
+    private const FOLLOW_UP_DELAY_IN_WEEKDAYS = 3;
+
     /** @use HasFactory<ProspectFactory> */
     use HasFactory;
 
@@ -106,6 +108,10 @@ class Prospect extends Model
             return ProspectPipelineStage::Replied;
         }
 
+        if ($this->isFollowUpRequired()) {
+            return ProspectPipelineStage::FollowUpRequired;
+        }
+
         if ($this->contacted_at !== null) {
             return ProspectPipelineStage::Contacted;
         }
@@ -131,6 +137,18 @@ class Prospect extends Model
         };
 
         return "{$stage->detail()} Status: {$this->status->label()} · Enrichment: {$enrichment} · Outreach: {$outreach} · Contact: {$contact}";
+    }
+
+    public function isFollowUpRequired(): bool
+    {
+        if ($this->contacted_at === null || $this->replied_at !== null || $this->follow_up_paused_at !== null) {
+            return false;
+        }
+
+        return $this->contacted_at
+            ->copy()
+            ->addWeekdays(self::FOLLOW_UP_DELAY_IN_WEEKDAYS)
+            ->lessThanOrEqualTo(now());
     }
 
     private function stageBeforeOutreach(): ProspectPipelineStage

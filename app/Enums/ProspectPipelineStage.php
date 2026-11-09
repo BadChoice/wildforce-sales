@@ -13,6 +13,7 @@ enum ProspectPipelineStage: string
     case DraftReady = 'draft_ready';
     case ReadyToSend = 'ready_to_send';
     case Contacted = 'contacted';
+    case FollowUpRequired = 'follow_up_required';
     case Replied = 'replied';
     case Disqualified = 'disqualified';
 
@@ -28,6 +29,7 @@ enum ProspectPipelineStage: string
             self::DraftReady => 'Draft ready',
             self::ReadyToSend => 'Ready to send',
             self::Contacted => 'Contacted',
+            self::FollowUpRequired => 'Follow up required',
             self::Replied => 'Replied',
             self::Disqualified => 'Disqualified',
         };
@@ -45,6 +47,7 @@ enum ProspectPipelineStage: string
             self::DraftReady => 'Review, rebuild, or approve the draft.',
             self::ReadyToSend => 'The approved message is ready for manual sending.',
             self::Contacted => 'Waiting for a reply.',
+            self::FollowUpRequired => 'No reply after three business days; send a follow-up.',
             self::Replied => 'A reply needs review and a next action.',
             self::Disqualified => 'Not a fit; follow-ups are paused.',
         };
@@ -59,6 +62,7 @@ enum ProspectPipelineStage: string
             self::DraftReady => 'violet',
             self::ReadyToSend => 'indigo',
             self::Contacted => 'sky',
+            self::FollowUpRequired => 'amber',
             self::EnrichmentFailed, self::OutreachFailed, self::Disqualified => 'red',
             self::Replied => 'purple',
         };
@@ -72,7 +76,7 @@ enum ProspectPipelineStage: string
             self::EnrichmentFailed, self::OutreachFailed => 'exclamation-circle',
             self::Qualified => 'check-circle',
             self::DraftReady => 'document-text',
-            self::ReadyToSend, self::Contacted => 'paper-airplane',
+            self::ReadyToSend, self::Contacted, self::FollowUpRequired => 'paper-airplane',
             self::Replied => 'chat-bubble-left',
             self::Disqualified => 'x-circle',
         };
@@ -87,6 +91,7 @@ enum ProspectPipelineStage: string
             self::DraftReady => 70,
             self::ReadyToSend => 80,
             self::Contacted => 90,
+            self::FollowUpRequired => 95,
             self::Replied, self::Disqualified => 100,
         };
     }

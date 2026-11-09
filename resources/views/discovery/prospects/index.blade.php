@@ -84,6 +84,7 @@
                                                 'bg-violet-600 dark:bg-violet-400' => $stage->color() === 'violet',
                                                 'bg-indigo-600 dark:bg-indigo-400' => $stage->color() === 'indigo',
                                                 'bg-sky-600 dark:bg-sky-400' => $stage->color() === 'sky',
+                                                'bg-amber-500 dark:bg-amber-400' => $stage->color() === 'amber',
                                                 'bg-purple-600 dark:bg-purple-400' => $stage->color() === 'purple',
                                             ]) style="width: {{ $stage->progress() }}%"></div>
                                         </div>

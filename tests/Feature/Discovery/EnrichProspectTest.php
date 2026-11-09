@@ -3,6 +3,7 @@
 use App\Ai\Agents\ProspectEnrichmentAgent;
 use App\Enums\ProspectEnrichmentStatus;
 use App\Enums\ProspectOutreachStatus;
+use App\Enums\ProspectPipelineStage;
 use App\Enums\ProspectStatus;
 use App\Jobs\EnrichProspect;
 use App\Models\Prospect;
@@ -54,6 +55,44 @@ it('renders the highest pipeline stage and its progress in the prospects index',
         ->assertSee('Status: Qualified')
         ->assertSee('Outreach: Draft ready')
         ->assertSee('width: 70%', false);
+});
+
+it('marks a contacted prospect as requiring follow up after three business days', function () {
+    $this->travelTo('2026-11-10 10:00:00', function (): void {
+        $user = User::factory()->growthAdmin()->create();
+        $prospect = Prospect::factory()->create(['contacted_at' => '2026-11-05 10:00:00']);
+
+        expect($prospect->pipelineStage())->toBe(ProspectPipelineStage::FollowUpRequired);
+
+        $this->actingAs($user)
+            ->get(route('discovery.prospects.index'))
+            ->assertOk()
+            ->assertSee('Follow up required');
+    });
+});
+
+it('keeps a contacted prospect waiting for a reply before three business days have passed', function () {
+    $this->travelTo('2026-11-09 10:00:00', function (): void {
+        $prospect = Prospect::factory()->create(['contacted_at' => '2026-11-05 10:00:00']);
+
+        expect($prospect->pipelineStage())->toBe(ProspectPipelineStage::Contacted);
+    });
+});
+
+it('does not require a follow up after a prospect replies or follow-ups are paused', function () {
+    $this->travelTo('2026-11-10 10:00:00', function (): void {
+        $repliedProspect = Prospect::factory()->create([
+            'contacted_at' => '2026-11-05 10:00:00',
+            'replied_at' => '2026-11-09 10:00:00',
+        ]);
+        $pausedProspect = Prospect::factory()->create([
+            'contacted_at' => '2026-11-05 10:00:00',
+            'follow_up_paused_at' => '2026-11-09 10:00:00',
+        ]);
+
+        expect($repliedProspect->pipelineStage())->toBe(ProspectPipelineStage::Replied);
+        expect($pausedProspect->pipelineStage())->toBe(ProspectPipelineStage::Contacted);
+    });
 });
 
 it('sorts prospects by every table column', function (string $sort, Closure $createProspects) {
