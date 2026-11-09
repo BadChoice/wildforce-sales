@@ -4,12 +4,14 @@ namespace App\Jobs;
 
 use App\Ai\Agents\ProspectDiscoveryAgent;
 use App\Enums\DiscoveryRunStatus;
+use App\Mail\DiscoveryCompleted;
 use App\Models\DiscoveryRun;
 use App\Services\Discovery\DiscoveryRunService;
 use App\Services\Discovery\ProspectDiscoveryService;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
 use Throwable;
 
@@ -71,6 +73,10 @@ class RunDiscoveryCampaign implements ShouldBeUnique, ShouldQueue
         }
 
         $runs->complete($run->fresh('campaign'), $response, $discoveredCount);
+
+        Mail::to((string) config('growth.discovery.report_recipient'))->queue(
+            (new DiscoveryCompleted($run->fresh('campaign')))->afterCommit(),
+        );
     }
 
     public function failed(Throwable $exception): void

@@ -42,14 +42,18 @@ it('forbids prospect enrichment for a user without growth access', function () {
     Queue::assertNothingPushed();
 });
 
-it('renders the prospect status in the prospects index', function () {
+it('renders the highest pipeline stage and its progress in the prospects index', function () {
     $user = User::factory()->growthAdmin()->create();
-    Prospect::factory()->create(['status' => ProspectStatus::Qualified]);
+    $prospect = Prospect::factory()->create(['status' => ProspectStatus::Qualified]);
+    ProspectOutreach::factory()->for($prospect)->create(['status' => ProspectOutreachStatus::Draft]);
 
     $this->actingAs($user)
         ->get(route('discovery.prospects.index'))
         ->assertOk()
-        ->assertSee('Qualified');
+        ->assertSee('Draft ready')
+        ->assertSee('Status: Qualified')
+        ->assertSee('Outreach: Draft ready')
+        ->assertSee('width: 70%', false);
 });
 
 it('sorts prospects by every table column', function (string $sort, Closure $createProspects) {
@@ -73,40 +77,10 @@ it('sorts prospects by every table column', function (string $sort, Closure $cre
             Prospect::factory()->create(['name' => 'Zaragoza Fitness', 'city' => 'Zaragoza']),
         ];
     }],
-    'status' => ['status', function (): array {
+    'stage' => ['stage', function (): array {
         return [
             Prospect::factory()->create(['name' => 'Discovered Fitness', 'status' => ProspectStatus::Discovered]),
             Prospect::factory()->create(['name' => 'Qualified Fitness', 'status' => ProspectStatus::Qualified]),
-        ];
-    }],
-    'enrichment' => ['enrichment', function (): array {
-        $completed = Prospect::factory()->create(['name' => 'Completed Enrichment Fitness']);
-        $queued = Prospect::factory()->create(['name' => 'Queued Enrichment Fitness']);
-
-        ProspectEnrichment::factory()->for($completed)->create(['status' => ProspectEnrichmentStatus::Completed]);
-        ProspectEnrichment::factory()->for($queued)->create(['status' => ProspectEnrichmentStatus::Queued]);
-
-        return [$completed, $queued];
-    }],
-    'outreach' => ['outreach', function (): array {
-        $approved = Prospect::factory()->create(['name' => 'Approved Outreach Fitness']);
-        $queued = Prospect::factory()->create(['name' => 'Queued Outreach Fitness']);
-
-        ProspectOutreach::factory()->for($approved)->create(['status' => ProspectOutreachStatus::Approved]);
-        ProspectOutreach::factory()->for($queued)->create(['status' => ProspectOutreachStatus::Queued]);
-
-        return [$approved, $queued];
-    }],
-    'contact' => ['contact', function (): array {
-        return [
-            Prospect::factory()->create(['name' => 'Not Contacted Fitness']),
-            Prospect::factory()->create(['name' => 'Contacted Fitness', 'contacted_at' => now()]),
-        ];
-    }],
-    'progress' => ['progress', function (): array {
-        return [
-            Prospect::factory()->create(['name' => 'Discovery Progress Fitness', 'status' => ProspectStatus::Discovered]),
-            Prospect::factory()->create(['name' => 'Qualified Progress Fitness', 'status' => ProspectStatus::Qualified]),
         ];
     }],
     'fit' => ['fit', function (): array {

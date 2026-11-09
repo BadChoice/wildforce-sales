@@ -21,10 +21,10 @@ use Throwable;
 
 class ProspectOutreachService
 {
-    public function queue(Prospect $prospect): ProspectOutreach
+    public function queue(Prospect $prospect, ?string $messageGuidance = null): ProspectOutreach
     {
         /** @var array{0: ProspectOutreach, 1: bool} $queuedOutreach */
-        $queuedOutreach = DB::transaction(function () use ($prospect): array {
+        $queuedOutreach = DB::transaction(function () use ($messageGuidance, $prospect): array {
             $prospect = Prospect::query()->lockForUpdate()->findOrFail($prospect->id);
             $this->ensureProspectIsReady($prospect);
 
@@ -41,7 +41,7 @@ class ProspectOutreachService
                 'status' => ProspectOutreachStatus::Queued,
                 'provider' => config('growth.outreach.provider'),
                 'model' => config('growth.outreach.model'),
-                'prompt' => $this->promptFor($prospect),
+                'prompt' => $this->promptFor($prospect, $messageGuidance),
             ]), true];
         });
 
@@ -63,7 +63,7 @@ class ProspectOutreachService
         ]);
     }
 
-    public function regenerate(ProspectOutreach $outreach): ProspectOutreach
+    public function regenerate(ProspectOutreach $outreach, ?string $messageGuidance = null): ProspectOutreach
     {
         if ($outreach->status !== ProspectOutreachStatus::Draft) {
             throw new LogicException('Only a draft can be rebuilt.');
@@ -74,7 +74,7 @@ class ProspectOutreachService
             'superseded_at' => now(),
         ]);
 
-        return $this->queue($outreach->prospect);
+        return $this->queue($outreach->prospect, $messageGuidance);
     }
 
     public function complete(ProspectOutreach $outreach, StructuredAgentResponse $response): void
@@ -172,12 +172,13 @@ class ProspectOutreachService
         }
     }
 
-    private function promptFor(Prospect $prospect): string
+    private function promptFor(Prospect $prospect, ?string $messageGuidance = null): string
     {
         $prospect->loadMissing('observations');
 
         return json_encode([
             'task' => 'Find the best public professional channel and draft a first outreach message for this qualified prospect.',
+            'message_guidance' => $messageGuidance,
             'prospect' => [
                 'name' => $prospect->name,
                 'segment' => $prospect->segment,

@@ -4,10 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Enums\ProspectStatus;
 use App\Http\Requests\DisqualifyProspectRequest;
+use App\Http\Requests\RegenerateProspectOutreachRequest;
 use App\Http\Requests\StoreProspectReplyRequest;
 use App\Http\Requests\UpdateProspectLanguageRequest;
 use App\Models\Prospect;
-use App\Models\ProspectEnrichment;
 use App\Models\ProspectOutreach;
 use App\Models\User;
 use App\Services\Discovery\ProspectEnrichmentService;
@@ -18,6 +18,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use LogicException;
+use SortDirection;
 
 class ProspectController extends Controller
 {
@@ -25,11 +26,7 @@ class ProspectController extends Controller
     private const SORTABLE_COLUMNS = [
         'business' => 'name',
         'location' => 'city',
-        'status' => 'status',
-        'enrichment' => 'enrichment',
-        'outreach' => 'outreach',
-        'contact' => 'contact',
-        'progress' => 'progress',
+        'stage' => 'stage',
         'fit' => 'score',
         'suggested-angle' => 'suggested_angle',
     ];
@@ -40,7 +37,9 @@ class ProspectController extends Controller
         $search = $request->string('search')->trim()->toString();
         $sort = $request->string('sort')->toString();
         $sort = array_key_exists($sort, self::SORTABLE_COLUMNS) ? $sort : 'fit';
-        $direction = $request->string('direction')->toString() === 'asc' ? 'asc' : 'desc';
+        $direction = $request->string('direction')->toString() === 'asc'
+            ? SortDirection::Ascending
+            : SortDirection::Descending;
 
         $prospectsQuery = Prospect::query()
             ->with(['latestEnrichment', 'latestOutreach', 'latestReply'])
@@ -58,20 +57,26 @@ class ProspectController extends Controller
     }
 
     /** @param Builder<Prospect> $prospectsQuery */
-    private function applySort(Builder $prospectsQuery, string $sort, string $direction): void
+    private function applySort(Builder $prospectsQuery, string $sort, SortDirection $direction): void
     {
         match ($sort) {
             'location' => $prospectsQuery->orderBy('city', $direction)->orderBy('province', $direction),
-            'enrichment' => $prospectsQuery->orderBy($this->latestEnrichmentStatus(), $direction),
-            'outreach' => $prospectsQuery->orderBy($this->latestOutreachStatus(), $direction),
-            'contact' => $prospectsQuery->orderByRaw(<<<SQL
-                case
-                    when replied_at is not null then 2
-                    when contacted_at is not null then 1
-                    else 0
-                end {$direction}
-            SQL),
-            'progress' => $prospectsQuery->orderByRaw(<<<SQL
+            'stage' => $this->applyStageSort($prospectsQuery, $direction),
+            default => $prospectsQuery->orderBy(self::SORTABLE_COLUMNS[$sort], $direction),
+        };
+    }
+
+    /** @param Builder<Prospect> $prospectsQuery */
+    private function applyStageSort(Builder $prospectsQuery, SortDirection $direction): void
+    {
+        $bindings = [
+            ProspectStatus::Qualified->value,
+            ProspectStatus::Enriched->value,
+            ProspectStatus::Rejected->value,
+        ];
+
+        if ($direction === SortDirection::Ascending) {
+            $prospectsQuery->orderByRaw(<<<'SQL'
                 case
                     when replied_at is not null then 100
                     when contacted_at is not null then 90
@@ -80,32 +85,23 @@ class ProspectController extends Controller
                     when status = ? then 45
                     when status = ? then 100
                     else 25
-                end {$direction}
-            SQL, [
-                ProspectStatus::Qualified->value,
-                ProspectStatus::Enriched->value,
-                ProspectStatus::Rejected->value,
-            ]),
-            default => $prospectsQuery->orderBy(self::SORTABLE_COLUMNS[$sort], $direction),
-        };
-    }
+                end asc
+            SQL, $bindings);
 
-    private function latestEnrichmentStatus(): Builder
-    {
-        return ProspectEnrichment::query()
-            ->select('status')
-            ->whereColumn('prospect_enrichments.prospect_id', 'prospects.id')
-            ->latest('id')
-            ->limit(1);
-    }
+            return;
+        }
 
-    private function latestOutreachStatus(): Builder
-    {
-        return ProspectOutreach::query()
-            ->select('status')
-            ->whereColumn('prospect_outreaches.prospect_id', 'prospects.id')
-            ->latest('id')
-            ->limit(1);
+        $prospectsQuery->orderByRaw(<<<'SQL'
+            case
+                when replied_at is not null then 100
+                when contacted_at is not null then 90
+                when exists (select 1 from prospect_outreaches where prospect_outreaches.prospect_id = prospects.id) then 75
+                when status = ? then 60
+                when status = ? then 45
+                when status = ? then 100
+                else 25
+            end desc
+        SQL, $bindings);
     }
 
     public function show(Prospect $prospect): View
@@ -140,10 +136,11 @@ class ProspectController extends Controller
         return back()->with('status', "Outreach draft queued for '{$prospect->name}'.");
     }
 
-    public function regenerateOutreach(ProspectOutreach $outreach, ProspectOutreachService $outreaches): RedirectResponse
+    public function regenerateOutreach(RegenerateProspectOutreachRequest $request, ProspectOutreach $outreach, ProspectOutreachService $outreaches): RedirectResponse
     {
         try {
-            $outreaches->regenerate($outreach);
+            $messageGuidance = $request->string('message_guidance')->trim()->toString();
+            $outreaches->regenerate($outreach, $messageGuidance !== '' ? $messageGuidance : null);
         } catch (LogicException $exception) {
             return back()->with('error', $exception->getMessage());
         }

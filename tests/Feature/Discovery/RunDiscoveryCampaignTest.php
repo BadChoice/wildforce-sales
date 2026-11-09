@@ -3,10 +3,14 @@
 use App\Ai\Agents\ProspectDiscoveryAgent;
 use App\Enums\DiscoveryRunStatus;
 use App\Jobs\RunDiscoveryCampaign;
+use App\Mail\DiscoveryCompleted;
 use App\Models\DiscoveryCampaign;
 use App\Models\User;
+use Illuminate\Support\Facades\Mail;
 
 it('stores sourced candidates returned by the discovery agent', function () {
+    Mail::fake();
+
     $campaign = DiscoveryCampaign::factory()->for(User::factory(), 'creator')->create();
     $run = $campaign->runs()->create([
         'status' => DiscoveryRunStatus::Queued,
@@ -54,4 +58,7 @@ it('stores sourced candidates returned by the discovery agent', function () {
 
     expect($run->fresh()->status)->toBe(DiscoveryRunStatus::Completed);
     ProspectDiscoveryAgent::assertPromptedTimes();
+    Mail::assertQueued(DiscoveryCompleted::class, function (DiscoveryCompleted $mail) use ($run): bool {
+        return $mail->hasTo('hello@wildforce.app') && $mail->run->is($run);
+    });
 });

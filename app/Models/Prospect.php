@@ -2,6 +2,9 @@
 
 namespace App\Models;
 
+use App\Enums\ProspectEnrichmentStatus;
+use App\Enums\ProspectOutreachStatus;
+use App\Enums\ProspectPipelineStage;
 use App\Enums\ProspectStatus;
 use Database\Factories\ProspectFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -93,56 +96,53 @@ class Prospect extends Model
         return $this->hasOne(ProspectReply::class)->latestOfMany();
     }
 
-    public function pipelineProgress(): int
+    public function pipelineStage(): ProspectPipelineStage
     {
+        if ($this->status === ProspectStatus::Rejected) {
+            return ProspectPipelineStage::Disqualified;
+        }
+
         if ($this->replied_at !== null) {
-            return 100;
+            return ProspectPipelineStage::Replied;
         }
 
         if ($this->contacted_at !== null) {
-            return 90;
+            return ProspectPipelineStage::Contacted;
         }
 
-        if ($this->latestOutreach !== null) {
-            return 75;
-        }
-
-        return match ($this->status) {
-            ProspectStatus::Qualified => 60,
-            ProspectStatus::Enriched => 45,
-            ProspectStatus::Rejected => 100,
-            default => 25,
+        return match ($this->latestOutreach?->status) {
+            ProspectOutreachStatus::Queued, ProspectOutreachStatus::Running => ProspectPipelineStage::OutreachInProgress,
+            ProspectOutreachStatus::Failed => ProspectPipelineStage::OutreachFailed,
+            ProspectOutreachStatus::Draft => ProspectPipelineStage::DraftReady,
+            ProspectOutreachStatus::Approved => ProspectPipelineStage::ReadyToSend,
+            default => $this->stageBeforeOutreach(),
         };
     }
 
-    public function nextStepLabel(): string
+    public function pipelineTooltip(): string
     {
-        if ($this->replied_at !== null) {
-            return 'Action needed';
-        }
-
-        if ($this->contacted_at !== null) {
-            return 'Waiting for reply';
-        }
-
-        if ($this->latestOutreach?->status?->value === 'draft' || $this->latestOutreach?->status?->value === 'approved') {
-            return 'Action needed';
-        }
-
-        return match ($this->status) {
-            ProspectStatus::Discovered => 'Enrichment needed',
-            ProspectStatus::Qualified => 'Outreach needed',
-            ProspectStatus::Rejected => 'Closed',
-            default => 'Review needed',
+        $stage = $this->pipelineStage();
+        $enrichment = $this->latestEnrichment?->status?->label() ?? 'Not started';
+        $outreach = $this->latestOutreach?->status?->label() ?? 'Not started';
+        $contact = match (true) {
+            $this->replied_at !== null => 'Replied',
+            $this->contacted_at !== null => 'Contacted',
+            default => 'Not contacted',
         };
+
+        return "{$stage->detail()} Status: {$this->status->label()} · Enrichment: {$enrichment} · Outreach: {$outreach} · Contact: {$contact}";
     }
 
-    public function nextStepColor(): string
+    private function stageBeforeOutreach(): ProspectPipelineStage
     {
-        return match ($this->nextStepLabel()) {
-            'Waiting for reply' => 'blue',
-            'Closed' => 'red',
-            default => 'amber',
+        return match ($this->status) {
+            ProspectStatus::Qualified => ProspectPipelineStage::Qualified,
+            ProspectStatus::Enriched => ProspectPipelineStage::Qualified,
+            default => match ($this->latestEnrichment?->status) {
+                ProspectEnrichmentStatus::Queued, ProspectEnrichmentStatus::Running => ProspectPipelineStage::EnrichmentInProgress,
+                ProspectEnrichmentStatus::Failed => ProspectPipelineStage::EnrichmentFailed,
+                default => ProspectPipelineStage::Discovered,
+            },
         };
     }
 

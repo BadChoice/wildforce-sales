@@ -22,7 +22,7 @@
         <div class="overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-700">
             @php
                 $sortLink = function (string $column) use ($direction, $search, $sort, $status): string {
-                    $nextDirection = $sort === $column && $direction === 'asc' ? 'desc' : 'asc';
+                    $nextDirection = $sort === $column && $direction === \SortDirection::Ascending ? 'desc' : 'asc';
 
                     return route('discovery.prospects.index', array_filter([
                         'search' => $search,
@@ -37,7 +37,7 @@
                         return '↕';
                     }
 
-                    return $direction === 'asc' ? '↑' : '↓';
+                    return $direction === \SortDirection::Ascending ? '↑' : '↓';
                 };
             @endphp
             <table class="min-w-full divide-y divide-neutral-200 text-sm dark:divide-neutral-700">
@@ -46,15 +46,11 @@
                         @foreach ([
                             'business' => 'Business',
                             'location' => 'Location',
-                            'status' => 'Status',
-                            'enrichment' => 'Enrichment',
-                            'outreach' => 'Outreach',
-                            'contact' => 'Contact',
-                            'progress' => 'Progress',
+                            'stage' => 'Stage',
                             'fit' => 'Fit',
                             'suggested-angle' => 'Suggested angle',
                         ] as $column => $label)
-                            <th class="px-5 py-3 font-medium" aria-sort="{{ $sort === $column ? ($direction === 'asc' ? 'ascending' : 'descending') : 'none' }}">
+                            <th class="px-5 py-3 font-medium" aria-sort="{{ $sort === $column ? ($direction === \SortDirection::Ascending ? 'ascending' : 'descending') : 'none' }}">
                                 <a href="{{ $sortLink($column) }}" wire:navigate class="inline-flex items-center gap-1 hover:text-neutral-950 dark:hover:text-white">
                                     {{ $label }}
                                     <span aria-hidden="true">{{ $sortIndicator($column) }}</span>
@@ -73,35 +69,26 @@
                             <td class="px-5 py-4">
                                 <span class="text-neutral-600 dark:text-neutral-300">{{ collect([$prospect->city, $prospect->province])->filter()->join(', ') ?: 'Unknown' }}</span>
                             </td>
-                            <td class="px-5 py-4">
-                                <flux:badge size="sm" :color="$prospect->status->badgeColor()">{{ $prospect->status->label() }}</flux:badge>
-                            </td>
-                            <td class="px-5 py-4">
-                                @if ($prospect->latestEnrichment === null)
-                                    <span class="text-neutral-500">Not started</span>
-                                @else
-                                    <flux:badge size="sm" :color="$prospect->latestEnrichment->status->badgeColor()">{{ $prospect->latestEnrichment->status->label() }}</flux:badge>
-                                @endif
-                            </td>
-                            <td class="px-5 py-4">
-                                @if ($prospect->latestOutreach === null)
-                                    <span class="text-neutral-500">Not started</span>
-                                @else
-                                    <flux:badge size="sm" :color="$prospect->latestOutreach->status->badgeColor()">{{ $prospect->latestOutreach->status->label() }}</flux:badge>
-                                @endif
-                            </td>
-                            <td class="px-5 py-4">
-                                @if ($prospect->replied_at)
-                                    <flux:badge size="sm" color="violet">Replied</flux:badge>
-                                @elseif ($prospect->contacted_at)
-                                    <flux:badge size="sm" color="blue">Contacted</flux:badge>
-                                @else
-                                    <span class="text-neutral-500">Not contacted</span>
-                                @endif
-                            </td>
-                            <td class="min-w-40 px-5 py-4">
-                                <flux:badge size="sm" :color="$prospect->nextStepColor()">{{ $prospect->nextStepLabel() }}</flux:badge>
-                                <flux:progress class="mt-2" :color="$prospect->nextStepColor()" style="--flux-progress-percentage: {{ $prospect->pipelineProgress() }}%" />
+                            <td class="min-w-48 px-5 py-4">
+                                @php($stage = $prospect->pipelineStage())
+                                <flux:tooltip :content="$prospect->pipelineTooltip()" position="top">
+                                    <div class="inline-flex cursor-help flex-col gap-2">
+                                        <flux:badge size="sm" :color="$stage->color()" :icon="$stage->icon()">{{ $stage->label() }}</flux:badge>
+                                        <div class="h-1.5 w-40 overflow-hidden rounded-full bg-neutral-200 dark:bg-white/10">
+                                            <div @class([
+                                                'h-full rounded-full transition-[width] duration-300',
+                                                'bg-zinc-600 dark:bg-zinc-400' => $stage->color() === 'zinc',
+                                                'bg-blue-600 dark:bg-blue-400' => $stage->color() === 'blue',
+                                                'bg-emerald-600 dark:bg-emerald-400' => $stage->color() === 'emerald',
+                                                'bg-red-600 dark:bg-red-400' => $stage->color() === 'red',
+                                                'bg-violet-600 dark:bg-violet-400' => $stage->color() === 'violet',
+                                                'bg-indigo-600 dark:bg-indigo-400' => $stage->color() === 'indigo',
+                                                'bg-sky-600 dark:bg-sky-400' => $stage->color() === 'sky',
+                                                'bg-purple-600 dark:bg-purple-400' => $stage->color() === 'purple',
+                                            ]) style="width: {{ $stage->progress() }}%"></div>
+                                        </div>
+                                    </div>
+                                </flux:tooltip>
                             </td>
                             <td class="px-5 py-4">
                                 @if ($prospect->score !== null)
@@ -115,7 +102,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="9" class="px-5 py-12 text-center text-neutral-500">No prospects match these filters.</td>
+                            <td colspan="5" class="px-5 py-12 text-center text-neutral-500">No prospects match these filters.</td>
                         </tr>
                     @endforelse
                 </tbody>

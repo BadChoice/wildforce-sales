@@ -76,7 +76,9 @@ it('rebuilds a draft while preserving the previous version', function () {
     ]);
 
     $this->actingAs($user)
-        ->post(route('discovery.outreaches.regenerate', $outreach))
+        ->post(route('discovery.outreaches.regenerate', $outreach), [
+            'message_guidance' => 'Focus on client progress and keep it concise.',
+        ])
         ->assertRedirect()
         ->assertSessionHas('status', 'Outreach draft rebuild queued.');
 
@@ -84,11 +86,34 @@ it('rebuilds a draft while preserving the previous version', function () {
         'id' => $outreach->id,
         'status' => 'superseded',
     ]);
-    $this->assertDatabaseHas('prospect_outreaches', [
-        'prospect_id' => $prospect->id,
-        'status' => 'queued',
-    ]);
+    $rebuiltOutreach = ProspectOutreach::query()
+        ->where('prospect_id', $prospect->id)
+        ->where('status', ProspectOutreachStatus::Queued)
+        ->sole();
+
+    expect($rebuiltOutreach->prompt)->toContain('Focus on client progress and keep it concise.');
     Queue::assertPushed(GenerateProspectOutreach::class);
+});
+
+it('does not rebuild a draft with message guidance that is too long', function () {
+    Queue::fake([GenerateProspectOutreach::class]);
+
+    $user = User::factory()->growthAdmin()->create();
+    $prospect = readyForOutreach();
+    $outreach = ProspectOutreach::factory()->for($prospect)->create([
+        'status' => ProspectOutreachStatus::Draft,
+    ]);
+
+    $this->actingAs($user)
+        ->from(route('discovery.prospects.show', $prospect))
+        ->post(route('discovery.outreaches.regenerate', $outreach), [
+            'message_guidance' => str_repeat('a', 1001),
+        ])
+        ->assertRedirect(route('discovery.prospects.show', $prospect))
+        ->assertSessionHasErrors('message_guidance');
+
+    expect($outreach->fresh()->status)->toBe(ProspectOutreachStatus::Draft);
+    Queue::assertNothingPushed();
 });
 
 it('forbids outreach generation for a user without growth access', function () {

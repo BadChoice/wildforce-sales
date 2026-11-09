@@ -6,6 +6,7 @@ return [
         'model' => env('GROWTH_DISCOVERY_MODEL', 'gpt-6-luna'),
         'qualified_score' => 70,
         'timeout' => 90,
+        'report_recipient' => env('GROWTH_DISCOVERY_REPORT_RECIPIENT', 'hello@wildforce.app'),
     ],
 
     'enrichment' => [

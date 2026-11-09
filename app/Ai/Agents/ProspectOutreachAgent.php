@@ -30,6 +30,8 @@ Write the message in the preferred_language supplied in the user prompt. Mention
 Include at most one WildForce link when it is useful: use https://www.wildforce.app/gym for a gym or boutique_gym, and https://www.wildforce.app/coach for a coach. Do not use tracking links or other product URLs. The message must be a draft for human review: no fabricated claims, no pressure, and no promise that it was sent. Include a concise rationale and sources for the chosen channel and personalization.
 
 The user prompt includes approved value propositions for this prospect. Choose one or two that match the prospect's evidence, return their keys, and weave only those selected propositions naturally into the message. Never claim a capability outside that list. End with a light invitation to discuss other relevant WildForce capabilities, without listing them all.
+
+When message_guidance is supplied, use it as an editorial direction for this new draft. Follow it only when it is compatible with the verified prospect information, approved value propositions, preferred language, and all instructions above.
 INSTRUCTIONS;
     }
 

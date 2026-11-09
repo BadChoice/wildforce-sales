@@ -160,13 +160,49 @@
                     @endif
 
                     <div class="flex flex-wrap gap-3">
-                        <flux:button type="button" variant="ghost" x-data x-on:click="navigator.clipboard.writeText({{ Js::from($outreach->message) }})" icon="clipboard">Copy message</flux:button>
+                        <flux:button
+                            type="button"
+                            variant="ghost"
+                            icon="clipboard"
+                            x-data="{
+                                message: @js($outreach->message),
+                                async copyMessage() {
+                                    let copied = false;
+
+                                    if (navigator.clipboard && window.isSecureContext) {
+                                        try {
+                                            await navigator.clipboard.writeText(this.message);
+                                            copied = true;
+                                        } catch (error) {
+                                        }
+                                    }
+
+                                    if (! copied) {
+                                        const textarea = document.createElement('textarea');
+                                        textarea.value = this.message;
+                                        textarea.style.position = 'fixed';
+                                        textarea.style.opacity = '0';
+                                        document.body.appendChild(textarea);
+                                        textarea.select();
+                                        copied = document.execCommand('copy');
+                                        textarea.remove();
+                                    }
+
+                                    document.dispatchEvent(new CustomEvent('toast-show', {
+                                        detail: {
+                                            slots: { text: copied ? 'Message copied.' : 'Could not copy the message.' },
+                                            dataset: { variant: copied ? 'success' : 'danger' },
+                                        },
+                                    }));
+                                },
+                            }"
+                            x-on:click="copyMessage()"
+                        >Copy message</flux:button>
 
                         @if ($outreach->status->value === 'draft')
-                            <form method="POST" action="{{ route('discovery.outreaches.regenerate', $outreach) }}">
-                                @csrf
-                                <flux:button type="submit" variant="ghost" icon="arrow-path">Rebuild draft</flux:button>
-                            </form>
+                            <flux:modal.trigger name="rebuild-outreach-draft">
+                                <flux:button type="button" variant="ghost" icon="arrow-path">Rebuild draft</flux:button>
+                            </flux:modal.trigger>
                             <form method="POST" action="{{ route('discovery.outreaches.approve', $outreach) }}">
                                 @csrf
                                 <flux:button type="submit" variant="primary" icon="check">Approve draft</flux:button>
@@ -181,6 +217,27 @@
                             </form>
                         @endif
                     </div>
+
+                    @if ($outreach->status->value === 'draft')
+                        <flux:modal name="rebuild-outreach-draft" :show="$errors->has('message_guidance')" class="max-w-lg">
+                            <form method="POST" action="{{ route('discovery.outreaches.regenerate', $outreach) }}" class="grid gap-5">
+                                @csrf
+                                <div>
+                                    <flux:heading size="lg">Rebuild outreach draft</flux:heading>
+                                    <flux:subheading class="mt-2">Optionally tell the agent how to approach the new message. The current draft will be kept in the history.</flux:subheading>
+                                </div>
+
+                                <flux:textarea name="message_guidance" label="Message guidance" rows="4" placeholder="e.g. Focus on client progress and keep it more concise.">{{ old('message_guidance') }}</flux:textarea>
+
+                                <div class="flex justify-end gap-3">
+                                    <flux:modal.close>
+                                        <flux:button type="button" variant="filled">Cancel</flux:button>
+                                    </flux:modal.close>
+                                    <flux:button type="submit" variant="primary" icon="arrow-path">Rebuild draft</flux:button>
+                                </div>
+                            </form>
+                        </flux:modal>
+                    @endif
                 </div>
             @endif
         </section>
